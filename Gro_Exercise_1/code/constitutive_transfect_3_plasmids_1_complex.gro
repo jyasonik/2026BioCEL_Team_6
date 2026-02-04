@@ -19,8 +19,8 @@
 
 
 // Mac OS:
-include /Applications/Gro/include/gro
-output_path := "/Applications/Gro/Gro_Exercise_1/output/";
+include /Users/jyasonik/Downloads/Gro_Mac/include/gro
+output_path := "/Users/jyasonik/Downloads/2026BioCEL_Team_6/Gro_Exercise_1/output/";
 
 // Windows:
 // include gro
@@ -150,9 +150,10 @@ program constitutive_3_plasmids_1_complex() := {
   // -------------------------------------------------
 
 
-  plasmid_bfp := 0;   // Number of BFP DNA plasmid molecules
-  plasmid_yfp := 0;   // Number of YFP DNA plasmid molecules
-  plasmid_rfp := 0;   // Number of RFP DNA plasmid molecules
+  complex := rand_normal 200 50;   // One complex delivers all 3 plasmids together
+  plasmid_bfp := complex;          // All three get the same amount
+  plasmid_yfp := complex;
+  plasmid_rfp := complex;
   
   
   // -------------------------------------------------
