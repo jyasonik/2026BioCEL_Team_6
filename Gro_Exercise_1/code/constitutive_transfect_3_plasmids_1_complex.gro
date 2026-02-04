@@ -1,0 +1,252 @@
+// ------------------------------------------------------
+// ------------------------------------------------------
+//             CHOOSE YOUR OPERATING SYSTEM
+//
+//  
+//  If you are running Mac OS, you do not need to change anything.
+//
+//  If you are running Windows, comment-out the two lines underneath
+//    "Mac OS:" below, and then un-comment the two lines underneath
+//    "Windows:".
+//
+//  (Putting two slashes in front of a line makes it a comment.)
+//
+//  If you are running GNU/Linux, comment-out the Mac lines 
+//    and un-comment the GNU/Linux lines.
+//
+// ------------------------------------------------------
+// ------------------------------------------------------
+
+
+// Mac OS:
+include /Applications/Gro/include/gro
+output_path := "/Applications/Gro/Gro_Exercise_1/output/";
+
+// Windows:
+// include gro
+// output_path := "C:\Gro\Gro_Exercise_1\output\";
+
+// GNU/Linux:
+// include ~/Gro/include/gro
+// output_path := "~/Gro/Gro_Exercise_1/output/";
+
+
+
+// ------------------------------------------------------
+// ------------------------------------------------------
+//             DO NOT EDIT BELOW THIS LINE
+// (except where noted below, to fill in your solution)
+// ------------------------------------------------------
+// ------------------------------------------------------
+
+
+
+file := fopen (output_path <> "constitutive_transfect_3_plasmids_1_complex.csv", "w" );
+
+// BioCEL variables
+//
+num_cells               := 10;
+time_to_print_interval  :=  5.0;
+kill_daughter := false; // set to true to simulate only one cell
+
+//
+// Time
+//
+set ( "dt", 0.001 );
+set("ecoli_growth_rate", 0.04);
+set("ecoli_division_size_mean", 0.05*60);
+set("ecoli_division_size_variance", 0.01);
+division_time := 1.0*60;
+
+t := 0;
+
+// 
+// Protein Production  (Per Plasmid)
+// ---------------------------------
+// http://bionumbers.hms.harvard.edu/bionumber.aspx?s=y&id=104870&ver=4&hlid=55616
+// It takes about 82 seconds to translate a whole protein of about the four times the
+// size of yfp. So let's say it takes 20 seconds per protein so that's 3 per minute per
+// mRNA. 
+// 
+// 
+alpha_p := .08;
+message ( 0, "alpha_p = " <> tostring(alpha_p) <> "/ min" );
+
+// 
+// Protein Degradation
+// -------------------
+// Assume YFP is highly stable and lasts a *long* time. 
+// So I'll choose a really low number.
+// 
+beta_p := 0.01;
+message ( 0, "beta_p = " <> tostring(beta_p) <> " / min" );
+
+// 
+// Rendering saturation
+// --------------------
+// These parameters seem to settle in at around 1050 yfp_saturation_max molecules per unit volume.
+// So let's somewhere around that so we can see some noise.
+// 
+set ( "bfp_saturation_max", 100 );
+set ( "bfp_saturation_min", 20 );
+
+set ( "yfp_saturation_max", 500 );
+set ( "yfp_saturation_min", 20 );
+
+set ( "rfp_saturation_max", 500 );
+set ( "rfp_saturation_min", 20 );
+
+
+
+// Randomness
+// ----------
+// Use this function to sample from a normal distribution.
+// We recommend using this function in your solution!
+//
+// For example:
+//   w := rand_normal 5 10;  // w becomes -3.637
+//   x := rand_normal 5 10;  // x becomes 10.525
+//   y := rand_normal 5 10;  // y becomes 2.744
+//   z := rand_normal 5 10;  // z becomes 8.714
+//   etc. ...
+// 
+//   (every time the rand_normal function is called,
+//    it potentially returns a different value;
+//    in aggregate, these values will average to 5
+//    and have variance 10.)
+// 
+//
+
+fun rand_normal mean variance . 
+  let a_normal_dist := {-1.4916, -1.4224, -1.4023, -1.2141, -1.1135, -1.0891, -1.0616, -0.8637, -0.7697, -0.7648,
+                        -0.7423, -0.6156, -0.2256, -0.1961, -0.1924, -0.1774, -0.0068,  0.0326,  0.0774,  0.0859,
+		                     0.3714,  0.4882,  0.5525,  0.7481,  0.8886,  1.1006,  1.1174,  1.5326,  1.5442} in 
+     mean + variance * a_normal_dist[rand(29)]
+
+end;
+
+
+
+// 
+// 3-color, Single-Complex Constitutive Expression Program
+//
+// * Cells transfected with transfection complex containing the following plasmids:
+//   * Constitutive expression of Blue Fluorescent Protein (BFP)
+//   * Constitutive expression of Yellow Fluorescent Protein (YFP)
+//   * Constitutive expression of Red Fluorescent Protein (RFP)
+//
+program constitutive_3_plasmids_1_complex() := {
+
+  time_to_print :=  0;
+  
+  bfp := 0;                                // Number of BFP protein molecules
+  yfp := 0;                                // Number of YFP protein molecules
+  rfp := 0;                                // Number of RFP protein molecules
+  
+  
+  
+  // -------------------------------------------------
+  // START YOUR SOLUTION HERE (do not edit above this)
+  // -------------------------------------------------
+
+
+  plasmid_bfp := 0;   // Number of BFP DNA plasmid molecules
+  plasmid_yfp := 0;   // Number of YFP DNA plasmid molecules
+  plasmid_rfp := 0;   // Number of RFP DNA plasmid molecules
+  
+  
+  // -------------------------------------------------
+  // END YOUR SOLUTION HERE (do not edit below this)
+  // -------------------------------------------------
+  
+  
+  
+
+  // Transcription + translation (DNA --> protein)
+  rate ( alpha_p * volume * plasmid_bfp ) :   { 
+  	bfp := bfp + 1;
+  };
+  rate ( alpha_p * volume * plasmid_yfp ) :   { 
+  	yfp := yfp + 1;
+  };
+  rate ( alpha_p * volume * plasmid_rfp ) :   { 
+  	rfp := rfp + 1;
+  };
+
+  // protein degradation
+  rate ( beta_p * bfp ) :     {
+  	bfp := bfp - 1;
+  };
+  rate ( beta_p * yfp ) :     {
+  	yfp := yfp - 1;
+  };
+  rate ( beta_p * rfp ) :     {
+  	rfp := rfp - 1;
+  };
+ 
+  // Kill cells after division, to save simulation time...
+  just_divided & daughter & kill_daughter : {
+    die();
+  }
+
+  // Print periodically
+  t > time_to_print : {
+    fprint (file,
+            id, ", ", t, ", ", volume, ", ",
+            plasmid_bfp, ", ", 
+            plasmid_yfp, ", ", 
+            plasmid_rfp, ", ",
+            bfp, ", ", 
+            yfp, ", ", 
+            rfp, ", ",
+            "\n");
+    snapshot ( output_path <> "constitutive_transfect_3_plasmids_1_complex_" <> tostring(floor(t)) <> ".png" );
+    time_to_print := t + time_to_print_interval;
+  };
+};
+
+
+//
+// Main program for counting time
+
+program main() := {
+
+  fprint (file, "cell id, time, volume, plasmid_bfp, plasmid_yfp, plasmid_rfp, bfp, yfp, rfp, \n" );
+
+  true : { t := t + dt }
+
+};
+
+
+// 
+// Mouse handling
+// 
+program report() := {
+
+  needs bfp, plasmid_bfp, yfp, plasmid_yfp, rfp, plasmid_rfp;
+
+  selected : { message ( 1,
+          "cell "  <> tostring(id)
+     <> ", p_bfp=" <> tostring(plasmid_bfp)
+     <> ", p_yfp=" <> tostring(plasmid_yfp)
+     <> ", p_rfp=" <> tostring(plasmid_rfp)
+     <> ", bfp="   <> tostring(bfp)
+     <> ", yfp="   <> tostring(yfp)
+     <> ", rfp="   <> tostring(rfp)
+     ) }
+
+};
+
+// 
+// Associate the program with a cell
+//
+foreach q in range num_cells do 
+  ecoli ( [ 
+      x := rand(300)-150, 
+      y := rand(300)-150, 
+      theta := 0.01*rand(314) ],
+    program constitutive_3_plasmids_1_complex() + report() sharing bfp, plasmid_bfp, yfp, plasmid_yfp, rfp, plasmid_rfp)
+end;
+
+
+
