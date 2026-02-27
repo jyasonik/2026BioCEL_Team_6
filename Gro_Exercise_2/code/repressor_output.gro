@@ -1,0 +1,247 @@
+// ------------------------------------------------------
+// ------------------------------------------------------
+//             CHOOSE YOUR OPERATING SYSTEM
+//
+//  
+//  If you are running Mac OS, you do not need to change anything.
+//
+//  If you are running Windows, comment-out the two lines underneath
+//    "Mac OS:" below, and then un-comment the two lines underneath
+//    "Windows:".
+//
+//  (Putting two slashes in front of a line makes it a comment.)
+//
+//  If you are running GNU/Linux, comment-out the Mac lines 
+//    and un-comment the GNU/Linux lines.
+//
+// ------------------------------------------------------
+// ------------------------------------------------------
+
+// Mac OS:
+include /Users/jyasonik/Downloads/Gro_Mac/include/gro
+include /Users/jyasonik/Downloads/Gro_Mac/biocel/repressor
+output_path := "/Users/jyasonik/Downloads/Gro_Mac/output/rep1/";
+
+// Windows:
+// include gro
+// include repressor
+// output_path := "C:\Gro\output\";
+
+// GNU/Linux:
+// include ~/Gro/include/gro
+// include ~/Gro/biocel/repressor
+// output_path := "~/Gro/output/";
+
+
+
+/////////////////////////////////////////////////////
+// Edit this to run different experimental conditions
+
+dox := 0.00001;
+
+/////////////////////////////////////////////////////
+
+
+file := fopen (output_path <> "rfp_repressor_dox=" <> tostring(dox) <> ".csv", "w" );
+
+//
+// BioCEL variables
+//
+num_cells              := 1;
+time_to_print_interval :=  5.0;
+kill_daughter := true; // set to true to simulate only one cell
+
+//
+// Time
+//
+set ( "dt", 0.005 );
+set("ecoli_growth_rate", 0.04);
+set("ecoli_division_size_mean", 0.05*60);
+set("ecoli_division_size_variance", 0.01);
+division_time := 1.0*60;
+
+//dt := 0.01;
+t := 0;
+
+// 
+// Protein Production  (Per Plasmid)
+// ---------------------------------
+// http://bionumbers.hms.harvard.edu/bionumber.aspx?s=y&id=104870&ver=4&hlid=55616
+// It takes about 82 seconds to translate a whole protein of about the four times the
+// size of yfp. So let's say it takes 20 seconds per protein so that's 3 per minute per
+// mRNA. 
+// 
+// 
+alpha_p := 0.1;
+message ( 0, "alpha_p = " <> tostring(alpha_p) <> "/ min" );
+
+// 
+// Protein Degradation
+// -------------------
+// Assume YFP is highly stable and lasts a *long* time. 
+// So I'll choose a really low number.
+// 
+beta_p := 0.01;
+message ( 0, "beta_p = " <> tostring(beta_p) <> " / min" );
+
+// 
+// Rendering saturation
+// --------------------
+// These parameters seem to settle in at around 1050 yfp molecules per unit volume.
+// So let's somewhere around that so we can see some noise.
+// 
+set ( "bfp_saturation_max", 1000 );
+set ( "bfp_saturation_min", 20 );
+
+set ( "yfp_saturation_max", 1000 );
+set ( "yfp_saturation_min", 20 );
+
+set ( "rfp_saturation_max", 1000 );
+set ( "rfp_saturation_min", 20 );
+
+//
+// Use this list to generate a normal distribution from a random uniform index into this list
+//
+a_normal_dist := {-1.4916, -1.4224, -1.4023, -1.2141, -1.1135, -1.0891, -1.0616, -0.8637, -0.7697, -0.7648,
+                  -0.7423, -0.6156, -0.2256, -0.1961, -0.1924, -0.1774, -0.0068,  0.0326,  0.0774,  0.0859,
+		   0.3714,  0.4882,  0.5525,  0.7481,  0.8886,  1.1006,  1.1174,  1.5326,  1.5442};
+// Transcriptional Cascade Program
+//
+// * constitutive Gal4VP16
+// * constitutive rtTA
+// * Dox + rtTA --> R
+// * Hybrid promoter (+Gal4VP16, -R) -> FP
+//
+program cascade() := {
+  
+  bfp := 0; // constitutive
+  yfp := 0; // repressor proxy
+  rfp := 0; // output
+  repressor := 0;
+
+  plasmid_constitutive := 200;
+  plasmid_repressor := 200;
+  plasmid_output := 200;
+
+  time_to_print := 0;
+  
+  
+
+  // ------------------------
+  // START YOUR SOLUTION HERE
+  // ------------------------
+
+  // Initialize output production rate (stored in variable — NOT called inside rate())
+  output_production_rate := production_rate(prod_rates_list.rep1)(plasmid_output)(repressor);
+
+  // ── BFP (constitutive) ──────────────────────────────────────────
+  // Transcription + translation (DNA → protein)
+  rate ( alpha_p * volume * plasmid_constitutive ) : {
+    bfp := bfp + 1;
+  };
+  // Protein degradation
+  rate ( beta_p * bfp ) : {
+    bfp := bfp - 1;
+  };
+
+  // ── Repressor + YFP (dox-activated) ─────────────────────────────
+  // dox + rtTA drives this promoter, so production scales with dox
+  rate ( alpha_p * volume * dox * plasmid_repressor ) : {
+    repressor := repressor + 1;
+    yfp := yfp + 1;
+  };
+  // Protein degradation
+  rate ( beta_p * repressor ) : {
+    repressor := repressor - 1;
+  };
+  rate ( beta_p * yfp ) : {
+    yfp := yfp - 1;
+  };
+
+  // ── RFP (hybrid promoter output) ─────────────────────────────────
+  // Production rate determined by production_rate() function
+  rate ( output_production_rate ) : {
+    rfp := rfp + 1;
+  };
+  // Protein degradation
+  rate ( beta_p * rfp ) : {
+    rfp := rfp - 1;
+  };
+
+  // ── Keep output_production_rate current ──────────────────────────
+  // Update every timestep as repressor amount changes stochastically
+  true : {
+    output_production_rate := production_rate(prod_rates_list.rep1)(plasmid_output)(repressor);
+  };
+  // Also update on cell division (discrete change in protein amounts)
+  just_divided : {
+    output_production_rate := production_rate(prod_rates_list.rep1)(plasmid_output)(repressor);
+  };
+
+  // -----------------------
+  // END YOUR SOLUTION HERE
+  // -----------------------
+  
+  
+  
+  just_divided & daughter & kill_daughter : {
+    die();
+  }
+
+  time_to_print < t : {
+    fprint ( file,
+             id, ", ",
+             t, ", ",
+             volume, ", ",
+             dox, ", ",
+             bfp, ",",
+             repressor, ", ",
+             rfp, ", ", 
+             plasmid_constitutive, ", ",
+             plasmid_repressor, ", ",
+             plasmid_output, ", ",
+             "\n" );
+    // snapshot ( output_path <> "repressor_output_dox=" <> tostring(dox) <> "t=" <> tostring(t) <> ".tif" );
+    time_to_print := t + time_to_print_interval;
+  };
+};
+
+// Main program for counting time
+
+program main() := {
+
+   fprint ( file, "cell id, time, volume, dox, bfp, repressor, rfp, plasmid_constitutive, plasmid_repressor, plasmid_output \n" );
+   true : { t := t + dt }
+};
+
+// 
+// Mouse handling
+// 
+program report() := {
+
+  needs bfp, yfp, rfp, plasmid_constitutive, plasmid_repressor, plasmid_output, repressor;
+
+  selected : { message ( 1,
+          "cell "  <> tostring(id)
+     <> ", p_const=" <> tostring(plasmid_constitutive)
+     <> ", p_rep=" <> tostring(plasmid_repressor)
+     <> ", p_out=" <> tostring(plasmid_output)
+     <> ", bfp="   <> tostring(bfp)
+	 <> ", yfp="   <> tostring(yfp)
+     //<> ", [yfp]=" <> tostring(yfp/volume)
+     <> ", rfp="   <> tostring(rfp)
+     //<> ", [rfp]=" <> tostring(rfp/volume)
+	 <> ", repressor="   <> tostring(repressor)
+     ) }
+};
+
+// 
+// Associate the program with a cell
+//
+foreach q in range num_cells do 
+  ecoli ( [ 
+      x := rand(300)-150, 
+      y := rand(300)-150, 
+      theta := 0.01*rand(314) ],
+    program cascade() + report() sharing bfp, yfp, rfp, plasmid_constitutive, plasmid_repressor, plasmid_output, repressor )
+end;
